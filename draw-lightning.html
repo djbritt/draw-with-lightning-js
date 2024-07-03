@@ -1,0 +1,163 @@
+<html><head><base href="https://websim.ai" />
+<title>WebSim Persistent Lightning Brush</title>
+<style>
+  body, html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: #000;
+    font-family: Arial, sans-serif;
+  }
+  #lightningCanvas {
+    display: block;
+    cursor: crosshair;
+  }
+  #controls {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    z-index: 100;
+    background-color: rgba(0,0,0,0.7);
+    padding: 10px;
+    border-radius: 5px;
+  }
+  button {
+    background-color: #3a86ff;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    margin-right: 5px;
+  }
+  button:hover {
+    background-color: #4361ee;
+  }
+  #instructions {
+    position: fixed;
+    bottom: 10px;
+    left: 10px;
+    color: #fff;
+    background-color: rgba(0,0,0,0.7);
+    padding: 10px;
+    border-radius: 5px;
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+<canvas id="lightningCanvas"></canvas>
+<div id="controls">
+  <button onclick="clearCanvas()">Clear Canvas</button>
+</div>
+<div id="instructions">
+  Click and drag to draw with lightning! Each bolt will fade after 5 seconds.
+</div>
+
+<script>
+const canvas = document.getElementById('lightningCanvas');
+const ctx = canvas.getContext('2d');
+
+let isDrawing = false;
+let lastX = 0;
+let lastY = 0;
+let hue = 0;
+let lightningBolts = [];
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+function drawLightningBolt(startX, startY, endX, endY, displace, roughness, paths = []) {
+  if (displace < roughness) {
+    paths.push({x1: startX, y1: startY, x2: endX, y2: endY});
+  } else {
+    const midX = (startX + endX) / 2;
+    const midY = (startY + endY) / 2;
+    const offsetX = (Math.random() - 0.5) * displace;
+    const offsetY = (Math.random() - 0.5) * displace;
+    
+    drawLightningBolt(startX, startY, midX + offsetX, midY + offsetY, displace / 2, roughness, paths);
+    drawLightningBolt(midX + offsetX, midY + offsetY, endX, endY, displace / 2, roughness, paths);
+  }
+  return paths;
+}
+
+function draw(e) {
+  if (!isDrawing) return;
+  
+  const currentHue = hue;
+  const paths = drawLightningBolt(lastX, lastY, e.clientX, e.clientY, 50, 5);
+  
+  const bolt = {
+    paths: paths,
+    hue: currentHue,
+    createdAt: Date.now(),
+    opacity: 1
+  };
+  
+  lightningBolts.push(bolt);
+  
+  [lastX, lastY] = [e.clientX, e.clientY];
+  
+  hue += 2;
+  if (hue >= 360) hue = 0;
+}
+
+canvas.addEventListener('mousedown', (e) => {
+  isDrawing = true;
+  [lastX, lastY] = [e.clientX, e.clientY];
+});
+
+canvas.addEventListener('mousemove', draw);
+canvas.addEventListener('mouseup', () => isDrawing = false);
+canvas.addEventListener('mouseout', () => isDrawing = false);
+
+function clearCanvas() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  lightningBolts = [];
+}
+
+function renderLightning() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  const currentTime = Date.now();
+  
+  lightningBolts = lightningBolts.filter(bolt => {
+    const age = currentTime - bolt.createdAt;
+    if (age > 5000) return false;
+    
+    bolt.opacity = 1 - (age / 5000);
+    
+    ctx.strokeStyle = `hsla(${bolt.hue}, 100%, 50%, ${bolt.opacity})`;
+    ctx.lineWidth = 2;
+    ctx.shadowColor = 'white';
+    ctx.shadowBlur = 10;
+    
+    ctx.beginPath();
+    bolt.paths.forEach(path => {
+      ctx.moveTo(path.x1, path.y1);
+      ctx.lineTo(path.x2, path.y2);
+    });
+    ctx.stroke();
+    
+    return true;
+  });
+}
+
+function animate() {
+  renderLightning();
+  requestAnimationFrame(animate);
+}
+
+animate();
+</script>
+
+</body></html>
